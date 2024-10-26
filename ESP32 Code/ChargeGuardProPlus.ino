@@ -46,9 +46,9 @@ void setup() {
   Serial.begin(115200); //setup baud rate = 115200
   Wire.begin(); //setup/initialize I2C comms on SDA/SCL
 
-  pinMode(CHARGE_BUTTON, INPUT_PULL); //
-
-  
+  pinMode(CHARGE_BUTTON, INPUT); //initiliaze CHARGE_BUTTON pin as an inpu
+  pinMode (CHARGE_CONTROL, OUTPUT); 
+  digitalWrite(CHARGE_CONTROL, LOW); //setting the CHARG_CONTROL with a low, charging is in an OFF state initially
 }
 
 void loop() {
