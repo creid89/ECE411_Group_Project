@@ -9,9 +9,10 @@
 #include <Adafruit_MLX90614.h>
 #include <Adafruit_SSD1306.h> //library for OLED
 
-#define CHARGE_BUTTON 12  //GPIO for charge start button Pin A12
-#define VOLTAGE_SENSOR 33 //pin for checking battery voltage
-#define CHARGE_CONTROL 27 //control charging ON and OFF states
+
+#define CHARGE_BUTTON 27  //GPIO for charge start button Pin 
+#define VOLTAGE_SENSOR 33 //pin for checking battery voltage --> Board Call Out 
+#define CHARGE_CONTROL 12 //control charging ON and OFF states
 #define SOLENOID_PIN 26 //GPIO pin for controlling solenoid using a MOSFET
 
 #define V_MIN 0.6 //0.6 is the minimum acceptable voltage to start charging
@@ -143,7 +144,10 @@ void loop() {
     case DONE:
       displayChargingStats(temp, chargeTotal);
       delay(5000); // Wait before resetting
-    digitalWrite(SOLENOID_PIN, HIGH); //eject battery using solenoid
+      digitalWrite(SOLENOID_PIN, HIGH); //eject battery using solenoid
+      delay(5000);
+      digitalWrite(SOLENOID_PIN, LOW);
+  
       currentState = WAIT;
       break;
   }
