@@ -9,14 +9,13 @@
 #include <Adafruit_MLX90614.h>
 #include <Adafruit_SSD1306.h> //library for OLED
 
-
 #define CHARGE_BUTTON 27  //GPIO for charge start button Pin 
 #define VOLTAGE_SENSOR 33 //pin for checking battery voltage --> Board Call Out 
 #define CHARGE_CONTROL 12 //control charging ON and OFF states
 #define SOLENOID_PIN 26 //GPIO pin for controlling solenoid using a MOSFET
 
 #define V_MIN 0.6 //0.6 is the minimum acceptable voltage to start charging
-#define V_MAX 1.4 //1.4 max voltage
+#define V_MAX 2 //Changed to 2 for troubleshooting, needs to be 1.4 in final rev
 #define TEMP_MIN 10 // max temp = 10 C
 #define TEMP_MAX 30 //max temp = 30 C
 #define CYCLE_MAX 4 //max number of cycles before battery ejects
@@ -28,12 +27,12 @@
 Adafruit_MLX90614 temp_sensor = Adafruit_MLX90614();
 
 // OLED Device setup
-Adafruit_SSD1306 OLED = Adafruit_SSD1306();
+Adafruit_SSD1306 OLED(128, 64, &Wire, -1);;
 
-float voltage = 0.0; //store battery voltage
-float temp = 0.0; //battery temp
-unsigned long chargeStart = 0.0;
-unsigned long chargeTotal = 0.0;
+float voltage = 0.0; //initialize battery voltage
+float temp = 0.0; //initialize battery temp
+unsigned long chargeStart = 0; //initialize charge start time
+unsigned long chargeTotal = 0; //initialize total charge time
 
 // Function Declaration
 int checkVoltage();
@@ -47,46 +46,69 @@ enum State_type { WAIT, CHECK_BATTERY, CHARGE, DONE };
 State_type currentState = WAIT; //when user powers on the device, the device enters into the WAIT state
 
 void setup() {
+  
   Serial.begin(115200); //setup baud rate = 115200
+  Serial.print("At the top of setup stage\n");
   Wire.begin(); //setup/initialize I2C comms on SDA/SCL
 
   temp_sensor.begin();  //setup MLX90614 Temperature sensor
 
+  if(!OLED.begin(SSD1306_SWITCHCAPVCC, 0x3C)){
+    Serial.print("OLED Setup Failed\n");
+    for(;;);//STOP!!! Forever FOR loop
+  }
+  
   // Setup OLED display
   OLED.begin(SSD1306_SWITCHCAPVCC, 0x3C); //OLED base address on ESP32 -> 0x3C
   OLED.clearDisplay();
   OLED.setTextSize(1);
   OLED.setTextColor(WHITE);
+  OLED.display();
   
   pinMode(CHARGE_BUTTON, INPUT); //initialize CHARGE_BUTTON pin as an input
   pinMode(CHARGE_CONTROL, OUTPUT); 
-  digitalWrite(CHARGE_CONTROL, LOW); //setting the CHARGE_CONTROL with a low, charging is in an OFF state initially
+  digitalWrite(CHARGE_CONTROL, LOW); //charging is in an OFF state initially
   pinMode(SOLENOID_PIN, OUTPUT);
   digitalWrite(SOLENOID_PIN, LOW);
+  Serial.print("At the bottom of setup stage\n");
 }
 
 void loop() {
+  Serial.print("At the top of loop stage\n");
+  delay(5000);
   switch (currentState) {
     case WAIT:
+      Serial.print("In WAIT state\n");
+      //delay(10000);
       clearDisplay();
       OLED.println("Current State: WAIT - Press START Button to Begin Charging\n");
       OLED.display();
-      
+
       // If Start button has been pressed, transition to CHECK_BATTERY state
-      if (digitalRead(CHARGE_BUTTON) == LOW) {
+      Serial.print("Status of CHARGE_BUTTON:  "); Serial.print(digitalRead(CHARGE_BUTTON)); Serial.print("\n ");
+      if(digitalRead(CHARGE_BUTTON) == HIGH) {
+        delay(10000);
+        Serial.print("Line 87\n");
         currentState = CHECK_BATTERY;
+        break;
       }
+     
+      Serial.print("line 92\n");
       break;
-    
     case CHECK_BATTERY:
+      //delay(10000);
+      Serial.print("At the top of CHECK_BATTERY\n"); 
       clearDisplay();
-      
-      voltage = readBatteryVoltage();  
+      voltage = readBatteryVoltage();
+      Serial.print("Battery voltage in CHECK_BATTERY state: ");
+      Serial.println(voltage);
       
       if (isBatteryPresent()) {
+        Serial.print("Battery Dtected!!!\n");
         OLED.println("Battery Detected!!!");
         OLED.display();
-        if(checkVoltage()){
+        //the below line of code should be if(checkVoltage()){ putting a 1 to troubleshoot code
+        if(1){
           currentState = CHARGE;
         } else {
           currentState = WAIT;
@@ -100,41 +122,56 @@ void loop() {
       break;
     
     case CHARGE:
+      Serial.print("in CHARGE state\n");
       digitalWrite(CHARGE_CONTROL, HIGH); //Start charging
       chargeTotal = 0; //reset charge time at the beginning of each charge
-      
+      chargeStart = millis();
       for(int i = 0; i <= CYCLE_MAX; i++) {
-        // Use millis() to measure charging time without blocking the program
         unsigned long cycleStartTime = millis();
+        
         while(millis() - chargeStart < CHARGE_TIME) {
-          temp = temp_sensor.readObjectTempC();
+          temp = 25.5; //using constant for tesing
+          //temp = temp_sensor.readObjectTempC();
+          Serial.print("Current Temp: ");
+          Serial.println(temp);
           clearDisplay();
           OLED.print("Current Temp: ");
           OLED.print(temp);
           OLED.print(" C");
 
           if(temp <= TEMP_MIN || temp >= TEMP_MAX) {
-            // Stop charging if temp is out of range
+            Serial.print("in the if(temp <= TEMP_MIN || temp >= TEMP_MAX block\n");
             digitalWrite(CHARGE_CONTROL, LOW);
             OLED.println("ERROR - Temperature Exceeded Range Boundaries During Charging Process");
             OLED.display();
             currentState = WAIT; //exit charge state
             return;
           }
+          //replaceing below line with if(0) for troubleshooting 
+          //should be if(!checkVoltage) {
+          Serial.print("Value of !checkVoltage Func: "); Serial.print(digitalRead(!checkVoltage()));Serial.print("\n");
           if(!checkVoltage()) {
-            digitalWrite(CHARGE_CONTROL, LOW); //voltage is out of range, stop charging
+            Serial.print("In the if(!checkVoltage) block\n");
+            digitalWrite(CHARGE_CONTROL, LOW); //voltage out of range, stop charging
             OLED.println("ERROR - Voltage Exceeded Limits During Charging Process");
             OLED.display();
+
             currentState = WAIT;
             return;
           }
-          if((voltage = readBatteryVoltage()) >= V_MAX) {
+
+          voltage = readBatteryVoltage();
+
+          if(voltage >= V_MAX) {
+            Serial.print("In the if(voltage >= V_MAX) block\n");
+
             digitalWrite(CHARGE_CONTROL, LOW); //voltage is at max, stop charging
             OLED.println("Battery Fully Charged - Charging Done");
             OLED.display();
             currentState = DONE;
             return;
           }
+
           chargeTotal += millis() - chargeStart; //sum up the total time
           cycleStartTime = millis(); //reset chargeStart for next while loop interval
         }
@@ -142,6 +179,7 @@ void loop() {
       break;  
     
     case DONE:
+      Serial.print("In the DONE state\n");
       displayChargingStats(temp, chargeTotal);
       delay(5000); // Wait before resetting
       digitalWrite(SOLENOID_PIN, HIGH); //eject battery using solenoid
@@ -158,24 +196,36 @@ void clearDisplay() {
   OLED.setCursor(0, 0);
 }
 
-float readBatteryVoltage() {
-  float ADC_voltage = analogRead(VOLTAGE_SENSOR);
-  // The analog digital value read by the ESP32 ranges from 0-4095
-  return (ADC_voltage / 4095) * 3.3; // may need to change to 5V
-}
-
 int isBatteryPresent() {
   if(readBatteryVoltage() > 0.1) {
+    Serial.print("In isBatteryPresent func\n");
     return 1;
   } else {
     return 0;
   }
 }
 
+float readBatteryVoltage() {
+  float ADC_voltage = analogRead(VOLTAGE_SENSOR);
+  Serial.print("Line 194\n");
+  //delay(10000);
+  if (ADC_voltage > 0) {
+    Serial.print("In the readBatteryVoltage func, returning voltage value: "); Serial.print((ADC_voltage / 4095.0) * 3.3); Serial.print("\n");
+    return (ADC_voltage / 4095.0) * 3.3;
+  } else {
+    Serial.println("Error: ADC_voltage is zero. Returning 0.");
+    return 0.0;
+  }
+}
+
 int checkVoltage() {
   voltage = readBatteryVoltage();
+  
+  Serial.print("Voltage in checkVoltage(): ");
+  Serial.println(voltage);
+
   if (voltage > V_MIN && voltage <= V_MAX) {
-    return 1;
+    return 1; // Voltage within acceptable range
   } else if (voltage >= V_MAX) {
     OLED.println("Battery Fully Charged");
     OLED.display();
