@@ -33,6 +33,8 @@ float voltage = 0.0; //initialize battery voltage
 float temp = 0.0; //initialize battery temp
 unsigned long chargeStart = 0; //initialize charge start time
 unsigned long chargeTotal = 0; //initialize total charge time
+unsigned long lastPollTime = 0; // to track 60-second intervals
+const unsigned long POLL_INTERVAL = 60000; // 60 seconds
 
 // Function Declaration
 int checkVoltage();
@@ -81,7 +83,7 @@ void loop() {
       Serial.print("In WAIT state\n");
       //delay(10000);
       clearDisplay();
-      OLED.println("Current State: WAIT - Press START Button to Begin Charging\n");
+      OLED.println("Current State: WAIT\nPress START Button to\nBegin Charging\n");
       OLED.display();
 
       // If Start button has been pressed, transition to CHECK_BATTERY state
@@ -105,8 +107,17 @@ void loop() {
       
       if (isBatteryPresent()) {
         Serial.print("Battery Dtected!!!\n");
+        clearDisplay();
         OLED.println("Battery Detected!!!");
         OLED.display();
+        delay(5000);
+        voltage = readBatteryVoltage();
+        OLED.print("Current Voltage Value\nof Battery: ");
+        OLED.println(voltage);
+        OLED.display();
+        delay(5000);
+
+        //clearDisplay();
         //the below line of code should be if(checkVoltage()){ putting a 1 to troubleshoot code
         if(1){
           currentState = CHARGE;
@@ -122,7 +133,7 @@ void loop() {
       break;
     
     case CHARGE:
-      Serial.print("in CHARGE state\n");
+      OLED.println("Entering CHARGE state\nStating Charging NOW");
       digitalWrite(CHARGE_CONTROL, HIGH); //Start charging
       chargeTotal = 0; //reset charge time at the beginning of each charge
       chargeStart = millis();
@@ -132,12 +143,15 @@ void loop() {
         while(millis() - chargeStart < CHARGE_TIME) {
           temp = 25.5; //using constant for tesing
           //temp = temp_sensor.readObjectTempC();
-          Serial.print("Current Temp: ");
-          Serial.println(temp);
-          clearDisplay();
+          //Serial.print("Current Temp: ");
+          //Serial.println(temp);
+          //delay(5000);
+          //clearDisplay();
+          delay(5000);
           OLED.print("Current Temp: ");
           OLED.print(temp);
-          OLED.print(" C");
+          OLED.print(" C\n");
+          OLED.display();
 
           if(temp <= TEMP_MIN || temp >= TEMP_MAX) {
             Serial.print("in the if(temp <= TEMP_MIN || temp >= TEMP_MAX block\n");
@@ -149,7 +163,7 @@ void loop() {
           }
           //replaceing below line with if(0) for troubleshooting 
           //should be if(!checkVoltage) {
-          Serial.print("Value of !checkVoltage Func: "); Serial.print(digitalRead(!checkVoltage()));Serial.print("\n");
+          Serial.print("Value of checkVoltage Func: "); Serial.print(digitalRead(!checkVoltage()));Serial.print("\n");
           if(!checkVoltage()) {
             Serial.print("In the if(!checkVoltage) block\n");
             digitalWrite(CHARGE_CONTROL, LOW); //voltage out of range, stop charging
@@ -158,6 +172,26 @@ void loop() {
 
             currentState = WAIT;
             return;
+          }
+          // Poll voltage every 60 seconds
+          if (millis() - lastPollTime >= POLL_INTERVAL) {
+            lastPollTime = millis();
+
+            // Stop charging to measure voltage
+            digitalWrite(CHARGE_CONTROL, LOW); // Stop charging
+            delay(100); 
+      
+            voltage = readBatteryVoltage(); // Measure voltage
+        
+
+            //clearDisplay();
+            OLED.print("Voltage Last Poll: ");
+            OLED.println(voltage);
+            OLED.display();
+            delay(5000); 
+        
+            // Restart charging
+            digitalWrite(CHARGE_CONTROL, HIGH);
           }
 
           voltage = readBatteryVoltage();
@@ -193,6 +227,8 @@ void loop() {
 
 void clearDisplay() {
   OLED.clearDisplay();
+  OLED.setCursor(0, 0);
+  OLED.display();
   OLED.setCursor(0, 0);
 }
 
