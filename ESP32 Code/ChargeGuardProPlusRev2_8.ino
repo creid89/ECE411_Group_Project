@@ -221,10 +221,12 @@ case CHARGE:
 
                 // Check voltage only during polling
                 if (!checkVoltage()) {
-                    Serial.println("ERROR: Voltage out of range during charging.");
-                    clearDisplay();
-                    OLED.println("ERROR - Voltage Out of Range!");
-                    OLED.display();
+                    //Serial.println("ERROR: Voltage out of range during charging.");
+                    //clearDisplay();
+                    //OLED.println("ERROR - Voltage Out of Range!");
+                    //OLED.display();
+                    delay(2500);
+                    Serial.print("\nLine 229\n");
                     delay(2500);
                     currentState = DONE;
                     return;
@@ -301,22 +303,22 @@ int checkVoltage() {
     OLED.println("Battery Fully Charged");
     OLED.display();
     delay(5000);
-    currentState = DONE;
-    //return 0;      
+    //currentState = DONE;
+    return 0;      
   } else if (voltage < V_MIN) {
     clearDisplay();
     OLED.println("ERROR - Battery Below Minimum Charging Voltage - Discard Battery");
     OLED.display();
     delay(5000);
     //return 0;        
-  } /*else {
+  } else {
     clearDisplay();
     OLED.println("Unknown Error: Returning to WAIT State");
     OLED.display();
     delay(5000);
-    currentState = DONE;
-    //return 0;  
-  }*/
+    //currentState = DONE;
+    return 0;  
+  }
   return 0;  
 }
 
@@ -326,7 +328,7 @@ void displayChargingStats(float temp, unsigned long chargeTotal, float voltage) 
   OLED.print("Final Temp: ");
   OLED.print(temp);
   OLED.println(" C");
-  OLED.print("Total Charge Time: ");
+  OLED.print("Charge Time: ");
   OLED.print(chargeTotal / 60000); // Time in minutes
   OLED.println(" min\n");
   OLED.print("Final Voltage: ");
